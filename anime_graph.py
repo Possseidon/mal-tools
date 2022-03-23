@@ -3,20 +3,20 @@ from pathlib import Path
 
 import graphviz
 import httpx
+from PIL import Image
 
 from related_anime import AnimeEntry, find_anime, get_related_anime
 
 
 async def download(anime: AnimeEntry):
-    filename = Path(f"cache/anime/{anime.id}.jpg")
+    filename = Path(f"cache/anime/{anime.id}.png")
     filename.parent.mkdir(parents=True, exist_ok=True)
     if filename.is_file():
         return anime.id, filename
 
     async with httpx.AsyncClient() as client:
-        with open(filename, 'wb') as f:
-            async for chunk in (await client.get(anime.image_url)).aiter_bytes():
-                f.write(chunk)
+        image = Image.open(await client.get(anime.image_url))
+    image.save(filename)
 
     return anime.id, filename
 
@@ -36,9 +36,15 @@ async def main():
     anime_images = dict(await asyncio.gather(*[download(anime) for anime in related_anime.values() if anime.image_url]))
 
     node_font = 'bahnschrift'
-    edge_font = 'Segoe UI'
+    edge_font = 'bahnschrift'
+
+    background_color = "#1F1F2F"
+    fill_color = "#1F0F2F"
+    outline_color = "#6F3F9F"
+    font_color = "#AF5FFF"
 
     graph = graphviz.Digraph("anime-graph")
+    graph.attr(bgcolor=background_color)
 
     for anime_id, anime in related_anime.items():
         image = f"""<TR>
@@ -48,7 +54,7 @@ async def main():
         graph.node(str(anime_id),
                    shape="plain",
                    label=f"""<
-                 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" HREF="https://myanimelist.net/anime/{anime_id}" TOOLTIP="{anime_id}">
+                 <TABLE BGCOLOR="{fill_color}" BORDER="0" CELLBORDER="2" CELLSPACING="0" HREF="https://myanimelist.net/anime/{anime_id}" TOOLTIP="{anime_id}">
                     <TR>
                         <TD COLSPAN="2"><![CDATA[{anime.title}]]></TD>
                     </TR>
@@ -58,7 +64,9 @@ async def main():
                     </TR>
                     {image}
                  </TABLE>>""",
-                   fontname=node_font)
+                   fontname=node_font,
+                   fontcolor=font_color,
+                   pencolor=outline_color)
 
     skippable = {
         ('sequel', 'prequel'),
@@ -88,7 +96,10 @@ async def main():
                    label=None if anime_relation.relation_type == 'sequel' else anime_relation.relation_type_formatted,
                    dir='none' if undirected else None,
                    fontname=edge_font,
-                   penwidth='5' if anime_relation.relation_type == 'sequel' else '1')
+                   penwidth='5' if anime_relation.relation_type == 'sequel' else '1',
+                   color=outline_color,
+                   fillcolor=outline_color,
+                   fontcolor=font_color)
 
     graph.render(format='svg', view=True, cleanup=True)
 
