@@ -1,0 +1,9 @@
+__pycache__/
+/cache/
+
+.*
+
+!.gitignore
+!/.vs
+
+/anime-graph.gv.svg
